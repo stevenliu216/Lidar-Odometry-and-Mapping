@@ -1,3 +1,11 @@
+/*
+  The main objective of scanRegistration is to preprocess point cloud and IMU data. 
+  This particular approach uses the curvature of point clouds to separate into various
+  features (Edge, Plane, or NaN). 
+  
+  See equation (1) for curvature equation in LOAM paper by Ji Zhang.
+*/
+
 #include <math.h>
 #include <time.h>
 #include <stdio.h>
