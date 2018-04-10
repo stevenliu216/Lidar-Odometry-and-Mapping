@@ -1,3 +1,14 @@
+/* Before we start, remember the big picture. After the last node, laserOdometry, we already have a 
+   odometry estimate. So why this node? 
+   
+   The answer is, due to the unavoidable measurement noise!  
+
+   Also, this node is very computationally expensive, so it is called at 1 Hz task rate.
+
+   In LOAM paper, Fig 8 is a very helpful visual of what's going on here. However, the LOAM paper does not really
+   explain at all what is going on. 
+ */
+
 #include <math.h>
 #include <time.h>
 #include <stdio.h>
@@ -20,6 +31,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/kdtree/kdtree_flann.h>
 
+/* Many parameters that can be tuned in KITTI */
 const double PI = 3.1415926;
 
 const float scanPeriod = 0.1;
@@ -37,6 +49,8 @@ bool newLaserCloudSurfLast = false;
 bool newLaserCloudFullRes = false;
 bool newLaserOdometry = false;
 
+/* Especially here */
+/* The below has to do with dividing the map point cloud Q_{k-1} into a cubes */
 int laserCloudCenWidth = 10;
 int laserCloudCenHeight = 5;
 int laserCloudCenDepth = 10;
@@ -391,6 +405,7 @@ int main(int argc, char** argv)
     laserCloudSurfArray2[i].reset(new pcl::PointCloud<pcl::PointXYZI>());
   }
 
+  /* frameCount initializes as 0, mapFrameCount initializes as 4 */
   int frameCount = stackFrameNum - 1;
   int mapFrameCount = mapFrameNum - 1;
   ros::Rate rate(100);
@@ -408,6 +423,8 @@ int main(int argc, char** argv)
       newLaserOdometry = false;
 
       frameCount++;
+
+	  /* Coordinate transform here */
       if (frameCount >= stackFrameNum) {
         transformAssociateToMap();
 
@@ -424,15 +441,28 @@ int main(int argc, char** argv)
         }
       }
 
+	  /* Optimization step */
+	  /* WTF is this code */
+
+	  /* From LOAM paper:
+	     To find correspondences for the feature points, we store the point cloud 
+		 on the map, Q_{k-1} , in 10m cubic areas. The points in the cubes that 
+		 intersect with \bar{Q}_{k} are extracted and stored in a 3D KD-tree in {W}. 
+		 We find the points in Q_{k-1} within  a certain region (10cm × 10cm × 10cm) around the feature points.
+	  */
       if (frameCount >= stackFrameNum) {
         frameCount = 0;
 
-        pcl::PointXYZI pointOnYAxis;
+		/* Find which subcube the currently estimated lidar pose corresponds to. i,j,k are the indices of the cube.
+		 * For example when the coordinates are (-25,25), the cube would be centered at (10,5,10).
+		 */
+        pcl::PointXYZI pointOnYAxis; /* A point on the y-axis of the current Lidar coordinate system {L} (0,10,0) */
         pointOnYAxis.x = 0.0;
         pointOnYAxis.y = 10.0;
         pointOnYAxis.z = 0.0;
-        pointAssociateToMap(&pointOnYAxis, &pointOnYAxis);
+        pointAssociateToMap(&pointOnYAxis, &pointOnYAxis); /* Transforms to the world frame {W} */
 
+		/* index at the center of the cube */
         int centerCubeI = int((transformTobeMapped[3] + 25.0) / 50.0) + laserCloudCenWidth;
         int centerCubeJ = int((transformTobeMapped[4] + 25.0) / 50.0) + laserCloudCenHeight;
         int centerCubeK = int((transformTobeMapped[5] + 25.0) / 50.0) + laserCloudCenDepth;
@@ -441,7 +471,14 @@ int main(int argc, char** argv)
         if (transformTobeMapped[4] + 25.0 < 0) centerCubeJ--;
         if (transformTobeMapped[5] + 25.0 < 0) centerCubeK--;
 
+		/* If the subcube is taken at the edge of the largest cube,
+		 * the index of the cube corresponding to the point is moved 1 unit toward the center. 
+		   UNCLEAR - why?
+		   Do this for every index I J K
+		 */
         while (centerCubeI < 3) {
+
+		  /* Moves the pointer to the center  */
           for (int j = 0; j < laserCloudHeight; j++) {
             for (int k = 0; k < laserCloudDepth; k++) {
               int i = laserCloudWidth - 1;
@@ -464,6 +501,7 @@ int main(int argc, char** argv)
             }
           }
 
+		  /* Incrementing the cube indices */
           centerCubeI++;
           laserCloudCenWidth++;
         }
@@ -603,6 +641,10 @@ int main(int argc, char** argv)
           laserCloudCenDepth--;
         }
 
+
+
+		/* After processing the edge points, the next step is to find the corresponding registration point
+		   in the 5x5x5 neighbors of the acquired cube */
         int laserCloudValidNum = 0;
         int laserCloudSurroundNum = 0;
         for (int i = centerCubeI - 2; i <= centerCubeI + 2; i++) {
@@ -616,6 +658,7 @@ int main(int argc, char** argv)
                 float centerY = 50.0 * (j - laserCloudCenHeight);
                 float centerZ = 50.0 * (k - laserCloudCenDepth);
 
+				/* Takes neighboring 8 points */
                 bool isInLaserFOV = false;
                 for (int ii = -1; ii <= 1; ii += 2) {
                   for (int jj = -1; jj <= 1; jj += 2) {
@@ -661,15 +704,18 @@ int main(int argc, char** argv)
           }
         }
 
+		/* The benefit of doing all of the above is that we no longer need to process huge point clouds
+		   We just need to process the neighboring cube regions. */
         laserCloudCornerFromMap->clear();
         laserCloudSurfFromMap->clear();
         for (int i = 0; i < laserCloudValidNum; i++) {
           *laserCloudCornerFromMap += *laserCloudCornerArray[laserCloudValidInd[i]];
           *laserCloudSurfFromMap += *laserCloudSurfArray[laserCloudValidInd[i]];
         }
-        int laserCloudCornerFromMapNum = laserCloudCornerFromMap->points.size();
-        int laserCloudSurfFromMapNum = laserCloudSurfFromMap->points.size();
+        int laserCloudCornerFromMapNum = laserCloudCornerFromMap->points.size(); /* The number of points on the feature edge */
+        int laserCloudSurfFromMapNum = laserCloudSurfFromMap->points.size(); /* The number of points on the active feature surface */
 
+		/* Transfers the current frame feature point in the world coordinate system to the current Lidar coordinate syste */
         int laserCloudCornerStackNum2 = laserCloudCornerStack2->points.size();
         for (int i = 0; i < laserCloudCornerStackNum2; i++) {
           pointAssociateTobeMapped(&laserCloudCornerStack2->points[i], &laserCloudCornerStack2->points[i]);
@@ -680,6 +726,7 @@ int main(int argc, char** argv)
           pointAssociateTobeMapped(&laserCloudSurfStack2->points[i], &laserCloudSurfStack2->points[i]);
         }
 
+		/* Filter the features points in the current frame */
         laserCloudCornerStack->clear();
         downSizeFilterCorner.setInputCloud(laserCloudCornerStack2);
         downSizeFilterCorner.filter(*laserCloudCornerStack);
@@ -692,6 +739,27 @@ int main(int argc, char** argv)
 
         laserCloudCornerStack2->clear();
         laserCloudSurfStack2->clear();
+
+		/* So far, we have all the map feature points near the current location of the lidar
+		   and the point cloud features of the current frame. Next we again use KD-tree to find the 
+		   nearest 5 points.. */
+
+		/* This involves Principle Component Analysis of the point cloud covariance matrix.
+		 * 
+		 * If the 5 points are distributed on a straight line, the eigenvalue of the covariance matrix
+		 * contains 1 element that is significantly larger than the others. The eigenvector associated 
+		 * with that eigenvalue represents the directorion of the straight line. 		
+		 *
+		 * If the 5 points are distributed on a plane, there is a significantly SMALLER element of the eigenvalue 
+		 * of the covariance matrix. The associated eigenvector represents 
+		 * the *normal* direction of the plane in which it lies. Thus we can find 2 points on the straight line
+		 * to construct a optimization problem via the the distance from point to line (See LOAM paper..)
+		 */
+
+		/* The plane features use the same idea as above, and after the optimization problem is fully built,
+		 * it is again solved by L-M iterative method. This is almost identical to laserOdometry code so there
+		 * are no more comments here.
+		 */
 
         if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 100) {
           kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMap);
@@ -1058,6 +1126,11 @@ int main(int argc, char** argv)
           laserCloudSurround->clear();
           downSizeFilterCorner.setInputCloud(laserCloudSurround2);
           downSizeFilterCorner.filter(*laserCloudSurround);
+
+		  /* I lied, 1 more comment is that in order to keep the real time operation going,
+		   * the environment cloud is only published every 5 frames.
+		   */
+
 
           sensor_msgs::PointCloud2 laserCloudSurround3;
           pcl::toROSMsg(*laserCloudSurround, laserCloudSurround3);
