@@ -30,12 +30,13 @@
 
 const double PI = 3.1415926;
 
+/* Magic Numbers - These will be different when running on KITTI dataset */
 const float scanPeriod = 0.1;
-
 const int systemDelay = 20;
 int systemInitCount = 0;
 bool systemInited = false;
 
+/* Declaring pcl containers */
 pcl::PointCloud<pcl::PointXYZ>::Ptr laserCloudIn(new pcl::PointCloud<pcl::PointXYZ>());
 pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloud(new pcl::PointCloud<pcl::PointXYZI>());
 pcl::PointCloud<pcl::PointXYZI>::Ptr cornerPointsSharp(new pcl::PointCloud<pcl::PointXYZI>());
@@ -45,13 +46,21 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr surfPointsLessFlat(new pcl::PointCloud<pcl:
 pcl::PointCloud<pcl::PointXYZI>::Ptr surfPointsLessFlatScan(new pcl::PointCloud<pcl::PointXYZI>());
 pcl::PointCloud<pcl::PointXYZI>::Ptr surfPointsLessFlatScanDS(new pcl::PointCloud<pcl::PointXYZI>());
 pcl::PointCloud<pcl::PointXYZ>::Ptr imuTrans(new pcl::PointCloud<pcl::PointXYZ>(4, 1));
+/* Original dataset uses VLP-16, hence the magic number 16 
+ * The KITTI dataset uses HDL-64E, we would use 64 here at the minimum.
+ * Needs more consideration for how to sort through the scans for HDL-64E.
+ */
 pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudScans[16];
 
+/* The size of these would need to be increased for KITTI dataset
+ * because of the HDL-64E having over 2 million points per scan
+ */
 float cloudCurvature[40000];
 int cloudSortInd[40000];
 int cloudNeighborPicked[40000];
 int cloudLabel[40000];
 
+/* Change 16 to 64 for KITTI */
 int scanStartInd[16];
 int scanEndInd[16];
 
@@ -88,6 +97,7 @@ float imuShiftX[imuQueLength] = {0};
 float imuShiftY[imuQueLength] = {0};
 float imuShiftZ[imuQueLength] = {0};
 
+/* Declare ros publishers */
 ros::Publisher* pubLaserCloudPointer;
 ros::Publisher* pubCornerPointsSharpPointer;
 ros::Publisher* pubCornerPointsLessSharpPointer;
@@ -198,6 +208,12 @@ void AccumulateIMUShift()
   }
 }
 
+/* laserCloudHandler is the main routine in scanRegistration. 
+ * According to LOAM paper, equation (1), features are found based on the point cloud
+ * curvature. Then the features are divided into a few categories, mainly edge/planar.
+ * 
+ * Observation: The code doesn't look like the math in equation (1)
+ */
 void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
 {
   if (!systemInited) {
@@ -213,6 +229,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
   pcl::fromROSMsg(*laserCloudIn2, *laserCloudIn);
   int cloudSize = laserCloudIn->points.size();
 
+  /* Starting angle and ending angle */
   float startOri = -atan2(laserCloudIn->points[0].y, laserCloudIn->points[0].x);
   float endOri = -atan2(laserCloudIn->points[cloudSize - 1].y, 
                         laserCloudIn->points[cloudSize - 1].x) + 2 * PI;
@@ -223,8 +240,24 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
     endOri += 2 * PI;
   }
 
+
+  /* Iterate through all point clouds !!!
+   * Divide into different lines based on the resulting angle calculation.
+   * 1 - Find angle
+   * 2 - Find start/end indices
+   * 3 - Insert IMU data
+   * 4 - Store in pcl containers
+   */
   bool halfPassed = false;
   pcl::PointXYZI point;
+
+  /* You can tell 3D lidar is very much different from 2D where you can get 
+   * a (range,bearing) every scan. 3D requires much more calculations.
+   */
+
+
+  /* This likely must be reworked for HDL-64E
+   */
   for (int i = 0; i < cloudSize; i++) {
     point.x = laserCloudIn->points[i].y;
     point.y = laserCloudIn->points[i].z;
@@ -260,6 +293,8 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
     float relTime = (ori - startOri) / (endOri - startOri);
     point.intensity = scanID + 0.1 * relTime;
 
+
+	/* IMU data is inserted here */
     if (imuPointerLast >= 0) {
       float pointTime = relTime * scanPeriod;
       while (imuPointerFront != imuPointerLast) {
@@ -320,6 +355,9 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
         imuShiftYStart = imuShiftYCur;
         imuShiftZStart = imuShiftZCur;
       } else {
+		/* !! 
+		 * Not in the first frame. Thus the IMU data is converted to the first frame of the IMU coordinates
+		 */
         ShiftToStartIMU(pointTime);
         VeloToStartIMU();
         TransformToStartIMU(&point);
@@ -329,10 +367,17 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
     laserCloudScans[scanID]->push_back(point);
   }
 
+  /* KITTI must use 64 here 
+   * This loop just updates the entire laserCloud
+   */
   for (int i = 0; i < 16; i++) {
     *laserCloud += *laserCloudScans[i];
   }
 
+  /* Below, calculate the curvature of the plane formed by a point and it's neighboring 10 points.
+   * Recall that radius of curvature = 1/curvature -> curvature = 1/R
+   * R*R is actually used to represent the curvature. So the bigger R*R is, the more curved.
+   */
   int scanCount = -1;
   for (int i = 5; i < cloudSize - 5; i++) {
     float diffX = laserCloud->points[i - 5].x + laserCloud->points[i - 4].x 
@@ -362,37 +407,56 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
     if (int(laserCloud->points[i].intensity) != scanCount) {
       scanCount = int(laserCloud->points[i].intensity);
 
+	  /* Should there be additional condition of scanCount < 16 or 64?  */
       if (scanCount > 0) {
+		/* The start and end indices of the scan
+		 * Arbitrarily filter out the first and last 5 points (KITTI needs tuning)
+		 */
         scanStartInd[scanCount] = i + 5;
         scanEndInd[scanCount - 1] = i - 5;
       }
     }
   }
+  /* We arbitrarily filtered out the first and last 5 points, so adjust accordingly here for KITTI */
   scanStartInd[0] = 5;
   scanEndInd[15] = cloudSize - 5;
 
+  /* According to LOAM paper for throwing out bad features (See Fig 4):
+   * 1. Plane/straight edges that are approximately parallel to the laser (a)
+   * 2. Occuluded edge points (b)
+   */
   for (int i = 5; i < cloudSize - 6; i++) {
-    float diffX = laserCloud->points[i + 1].x - laserCloud->points[i].x;
+    
+	float diffX = laserCloud->points[i + 1].x - laserCloud->points[i].x;
     float diffY = laserCloud->points[i + 1].y - laserCloud->points[i].y;
     float diffZ = laserCloud->points[i + 1].z - laserCloud->points[i].z;
+
+	/* Find the distance squared between points[i+1] and points[i] */
     float diff = diffX * diffX + diffY * diffY + diffZ * diffZ;
 
+	/* 0.1 is a magic number, potentially needs tuning for KITTI */
     if (diff > 0.1) {
 
+      /* depth of points[i] */
       float depth1 = sqrt(laserCloud->points[i].x * laserCloud->points[i].x + 
                      laserCloud->points[i].y * laserCloud->points[i].y +
                      laserCloud->points[i].z * laserCloud->points[i].z);
-
+	  /* depth of points[i+1] */
       float depth2 = sqrt(laserCloud->points[i + 1].x * laserCloud->points[i + 1].x + 
                      laserCloud->points[i + 1].y * laserCloud->points[i + 1].y +
                      laserCloud->points[i + 1].z * laserCloud->points[i + 1].z);
 
+	  /* This corresponds to (b) in Fig 4 
+	   * X(i+1)-X(i)*（|X(i+1)|/|X(i)|）
+	   */
       if (depth1 > depth2) {
         diffX = laserCloud->points[i + 1].x - laserCloud->points[i].x * depth2 / depth1;
         diffY = laserCloud->points[i + 1].y - laserCloud->points[i].y * depth2 / depth1;
         diffZ = laserCloud->points[i + 1].z - laserCloud->points[i].z * depth2 / depth1;
+		/* Think triangles */
 
         if (sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ) / depth2 < 0.1) {
+		  /* If the angle between X(i+1) and X(i) is less than 0.1.. or ~ 5.7 degrees */
           cloudNeighborPicked[i - 5] = 1;
           cloudNeighborPicked[i - 4] = 1;
           cloudNeighborPicked[i - 3] = 1;
@@ -416,6 +480,10 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
       }
     }
 
+	/* 
+	 * This corresponds to (a) in Fig 4.
+	 * Lots of magical variable names and numbers here
+	 */
     float diffX2 = laserCloud->points[i].x - laserCloud->points[i - 1].x;
     float diffY2 = laserCloud->points[i].y - laserCloud->points[i - 1].y;
     float diffZ2 = laserCloud->points[i].z - laserCloud->points[i - 1].z;
@@ -426,16 +494,26 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
               + laserCloud->points[i].z * laserCloud->points[i].z;
 
     if (diff > 0.0002 * dis && diff2 > 0.0002 * dis) {
+	  /* This 0.0002 is important, it is about 0.0115 degrees */
       cloudNeighborPicked[i] = 1;
     }
   }
 
+  /* Now, we should have a well organized set of point clouds, with the features being stored.
+   * We divide one scan into 4 sub-regions, and each sub-region provides a max of two edge and four 
+   * planars. Thresholds must be predefined in order to easily categorize these points. In the following
+   * code, each line gets divided into 6 segments and the segments are sorted in ascending order by curvature.
+   */
+  /* Lots of magic parameters to tune per above. Again, the 16 should be 64 for KITTI */
   for (int i = 0; i < 16; i++) {
     surfPointsLessFlatScan->clear();
     for (int j = 0; j < 6; j++) {
+	  /* This is where a line gets split into 6 segments */
+	  /* sp = start position, ep = end position */
       int sp = (scanStartInd[i] * (6 - j)  + scanEndInd[i] * j) / 6;
       int ep = (scanStartInd[i] * (5 - j)  + scanEndInd[i] * (j + 1)) / 6 - 1;
 
+	  /* Sort by curvature in ascending order */
       for (int k = sp + 1; k <= ep; k++) {
         for (int l = k; l >= sp + 1; l--) {
           if (cloudCurvature[cloudSortInd[l]] < cloudCurvature[cloudSortInd[l - 1]]) {
@@ -464,6 +542,9 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
             break;
           }
 
+		  /* Unclear from the paper what this is.
+		   * But it looks like checking the neighboring points for potential features.
+		   */
           cloudNeighborPicked[ind] = 1;
           for (int l = 1; l <= 5; l++) {
             float diffX = laserCloud->points[ind + l].x 
@@ -545,15 +626,18 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
       }
     }
 
+	/* The pcl library is used here for downsampling of lessFlatScan */
     surfPointsLessFlatScanDS->clear();
     pcl::VoxelGrid<pcl::PointXYZI> downSizeFilter;
     downSizeFilter.setInputCloud(surfPointsLessFlatScan);
+	/* What is with these magic numbers? */
     downSizeFilter.setLeafSize(0.2, 0.2, 0.2);
     downSizeFilter.filter(*surfPointsLessFlatScanDS);
 
     *surfPointsLessFlat += *surfPointsLessFlatScanDS;
   }
 
+  /* Initializing the topics to publish */
   sensor_msgs::PointCloud2 laserCloud2;
   pcl::toROSMsg(*laserCloud, laserCloud2);
   laserCloud2.header.stamp = laserCloudIn2->header.stamp;
@@ -613,11 +697,15 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudIn2)
   surfPointsFlat->clear();
   surfPointsLessFlat->clear();
 
+  /* Use 64 for KITTI */
   for (int i = 0; i < 16; i++) {
     laserCloudScans[i]->points.clear();
   }
 }
 
+/* imuHandler is another main routine in this node
+ * The code is much easier to read than the above laserCloudHandler
+ */
 void imuHandler(const sensor_msgs::Imu::ConstPtr& imuIn)
 {
   double roll, pitch, yaw;
