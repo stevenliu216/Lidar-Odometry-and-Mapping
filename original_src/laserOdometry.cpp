@@ -1,3 +1,12 @@
+/*
+ * The main goal here is clear from the file name, we use the point cloud data of two frames 
+ * to register point cloud between t and t+1, and we estimate the lidar's motion from that.
+
+ * Recall that the scanRegistration node allowed us to obtain point clouds with various features.
+ * Using those features between point clouds from t and t+1, we can establish 
+ * 1 to 1 correspondence and the clouds are considered registered!
+ * This is easier said than done...
+*/
 #include <math.h>
 #include <time.h>
 #include <stdio.h>
@@ -61,10 +70,10 @@ pcl::KdTreeFLANN<pcl::PointXYZI>::Ptr kdtreeSurfLast(new pcl::KdTreeFLANN<pcl::P
 int laserCloudCornerLastNum;
 int laserCloudSurfLastNum;
 
+/* The 40000 likely corresponds to VLP-16, we would need to increase these for the HDL-64E */
 int pointSelCornerInd[40000];
 float pointSearchCornerInd1[40000];
 float pointSearchCornerInd2[40000];
-
 int pointSelSurfInd[40000];
 float pointSearchSurfInd1[40000];
 float pointSearchSurfInd2[40000];
@@ -328,11 +337,15 @@ void imuTransHandler(const sensor_msgs::PointCloud2ConstPtr& imuTrans2)
   newImuTrans = true;
 }
 
+/* This is an extremely complex yet necessary main function!!!!
+ * Whomever wrote this really threw the whole kitchen sink in here...
+ */
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "laserOdometry");
   ros::NodeHandle nh;
 
+  /* Subscribe to the following topics and call respective callback function */
   ros::Subscriber subCornerPointsSharp = nh.subscribe<sensor_msgs::PointCloud2>
                                          ("/laser_cloud_sharp", 2, laserCloudSharpHandler);
 
@@ -351,6 +364,7 @@ int main(int argc, char** argv)
   ros::Subscriber subImuTrans = nh.subscribe<sensor_msgs::PointCloud2> 
                                 ("/imu_trans", 5, imuTransHandler);
 
+  /* Publish the following topics */
   ros::Publisher pubLaserCloudCornerLast = nh.advertise<sensor_msgs::PointCloud2>
                                            ("/laser_cloud_corner_last", 2);
 
@@ -368,6 +382,7 @@ int main(int argc, char** argv)
 
   //ros::Publisher pub4 = nh.advertise<sensor_msgs::PointCloud2> ("/pc4", 2);
 
+  /* Odometry publisher */
   ros::Publisher pubLaserOdometry = nh.advertise<nav_msgs::Odometry> ("/laser_odom_to_init", 5);
   nav_msgs::Odometry laserOdometry;
   laserOdometry.header.frame_id = "/camera_init";
@@ -383,6 +398,7 @@ int main(int argc, char** argv)
 
   pcl::PointXYZI pointOri, pointSel, tripod1, tripod2, tripod3, pointProj, coeff;
 
+  /* Why use opencv library? */
   bool isDegenerate = false;
   cv::Mat matP(6, 6, CV_32F, cv::Scalar::all(0));
 
@@ -390,8 +406,15 @@ int main(int argc, char** argv)
   ros::Rate rate(100);
   bool status = ros::ok();
   while (status) {
+
     ros::spinOnce();
 
+	/* What is this 0.005 threshold? Must be tuned per KITTI dataset */
+	/* Lets break it down into the following:
+	 * 1 - Init
+	   2 - Point Cloud Registration and motion estimation 
+	   3 - Coordinate transforms
+	 */
     if (newCornerPointsSharp && newCornerPointsLessSharp && newSurfPointsFlat && 
         newSurfPointsLessFlat && newLaserCloudFullRes && newImuTrans &&
         fabs(timeCornerPointsSharp - timeSurfPointsLessFlat) < 0.005 &&
@@ -406,7 +429,10 @@ int main(int argc, char** argv)
       newLaserCloudFullRes = false;
       newImuTrans = false;
 
+	  /* 1- Initialization step */
       if (!systemInited) {
+		/* This node has subscribed some data! Store it as a temp of the last time step */
+		/* Note that we only care if 2 scans were found, it's better to throw out the data if we only have 1 */
         pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudTemp = cornerPointsLessSharp;
         cornerPointsLessSharp = laserCloudCornerLast;
         laserCloudCornerLast = laserCloudTemp;
@@ -418,6 +444,7 @@ int main(int argc, char** argv)
         kdtreeCornerLast->setInputCloud(laserCloudCornerLast);
         kdtreeSurfLast->setInputCloud(laserCloudSurfLast);
 
+		/* Publish the last time step data */
         sensor_msgs::PointCloud2 laserCloudCornerLast2;
         pcl::toROSMsg(*laserCloudCornerLast, laserCloudCornerLast2);
         laserCloudCornerLast2.header.stamp = ros::Time().fromSec(timeSurfPointsLessFlat);
@@ -449,10 +476,35 @@ int main(int argc, char** argv)
       transform[4] -= imuVeloFromStartY * scanPeriod;
       transform[5] -= imuVeloFromStartZ * scanPeriod;
 
+	  /* 2 - Point Cloud Registration and motion estimation */
+
+	  /* This is the most essential part of LOAM!!
+	   * The point clouds must meet some criterias before we start:
+	   *  - Between two point clouds, there must be enough features
+	   *  - Otherwise, there's no point in registering point clouds with no features to track.
+	   *  - The magic numbers 10, 100 below are thresholds pertaining to above.
+	   *  - Specifically, the number of point clouds above the feature edge is > 10, and
+	   *    the point clouds within the feature plane is > 100
+	   */
       if (laserCloudCornerLastNum > 10 && laserCloudSurfLastNum > 100) {
-        int cornerPointsSharpNum = cornerPointsSharp->points.size();
-        int surfPointsFlatNum = surfPointsFlat->points.size();
-        for (int iterCount = 0; iterCount < 25; iterCount++) {
+		/* Criterias have been satisfied, begin registration */
+
+		/* Paper mentions doing some preprocessing here to throw out Nan points, don't see that in code */
+
+		
+        int cornerPointsSharpNum = cornerPointsSharp->points.size(); /* Number of point clouds on the feature edge at current time t */
+        int surfPointsFlatNum = surfPointsFlat->points.size();       /* Number of point clouds on the feature plane at current time t */
+        
+		/* Again, a magic number of iterations (25) that must be tuned for KITTI dataset */
+		/* Breaks down again in 3 steps:
+		 * 1 - Point registration on edges and construct the jacobian
+		 * 2 - Point registration on planes and construct the jacobian
+		 * 3 - L-M Solver (nonlinear least squares with a regularization parameter s) for motion estimation
+		 */
+		for (int iterCount = 0; iterCount < 25; iterCount++) {
+
+		  /* See 1 above - Edge */
+		  /* Here, KD-tree search is used */
           for (int i = 0; i < cornerPointsSharpNum; i++) {
             TransformToStart(&cornerPointsSharp->points[i], &pointSel);
 
@@ -509,6 +561,7 @@ int main(int argc, char** argv)
               pointSearchCornerInd2[i] = minPointInd2;
             }
 
+			/* Construct the jacobian for edge */
             if (pointSearchCornerInd2[i] >= 0) {
               tripod1 = laserCloudCornerLast->points[pointSearchCornerInd1[i]];
               tripod2 = laserCloudCornerLast->points[pointSearchCornerInd2[i]];
@@ -568,6 +621,9 @@ int main(int argc, char** argv)
             }
           }
 
+
+		  /* See 2 above - Plane */
+		  /* Similarly, KD-tree search is used */
           for (int i = 0; i < surfPointsFlatNum; i++) {
             TransformToStart(&surfPointsFlat->points[i], &pointSel);
 
@@ -635,6 +691,7 @@ int main(int argc, char** argv)
               pointSearchSurfInd3[i] = minPointInd3;
             }
 
+			/* Construct the jacobian for plane */
             if (pointSearchSurfInd2[i] >= 0 && pointSearchSurfInd3[i] >= 0) {
               tripod1 = laserCloudSurfLast->points[pointSearchSurfInd1[i]];
               tripod2 = laserCloudSurfLast->points[pointSearchSurfInd2[i]];
@@ -682,7 +739,13 @@ int main(int argc, char** argv)
               }
             }
           }
-
+		  /* At this point, we should have built up the jacobian matrix
+		   * The 3 elements of the jacobian matrix corresponding to each feature point
+		   * are stored in coeffSel, and we will directly call in L-M method
+		   */
+		  
+		  /* BEGIN L-M Method !! */
+		  /* The magic number 10 represents the number of matching points, AKA 10 constraints */
           int pointSelNum = laserCloudOri->points.size();
           if (pointSelNum < 10) {
             continue;
@@ -694,10 +757,21 @@ int main(int argc, char** argv)
           cv::Mat matB(pointSelNum, 1, CV_32F, cv::Scalar::all(0));
           cv::Mat matAtB(6, 1, CV_32F, cv::Scalar::all(0));
           cv::Mat matX(6, 1, CV_32F, cv::Scalar::all(0));
-          for (int i = 0; i < pointSelNum; i++) {
-            pointOri = laserCloudOri->points[i];
-            coeff = coeffSel->points[i];
 
+		  /* Constructing jacobian matrix */
+          for (int i = 0; i < pointSelNum; i++) {
+			/* The L-M (Levenberg-Marquardt) starts here*/
+			/* 1 - Point to edge and point to plane 
+			 * 2 - Create constraint equation
+			 * 3 - We need the partial derivatives of the coordinate transformation.. 3 rotates and 3 translations
+			 */
+			/* See equations (2)-(8) in LOAM Paper */
+
+            pointOri = laserCloudOri->points[i]; /* The current coordinates */
+            coeff = coeffSel->points[i];         /* Partial derivatives wrt this current coordinates */
+
+			/* s is a key parameter that needs tuning considerations */
+			/* What follows is a lot of BS, definitely look at paper and not the code */
             float s = 1; //10 * (pointOri.intensity - int(pointOri.intensity));
 
             float srx = sin(s * transform[0]);
@@ -751,6 +825,8 @@ int main(int argc, char** argv)
             matA.at<float>(i, 5) = atz;
             matB.at<float>(i, 0) = -0.05 * d2;
           }
+
+		  /* This is the least squares solution, using QR decomposition */
           cv::transpose(matA, matAt);
           matAtA = matAt * matA;
           matAtB = matAt * matB;
@@ -761,6 +837,7 @@ int main(int argc, char** argv)
             cv::Mat matV(6, 6, CV_32F, cv::Scalar::all(0));
             cv::Mat matV2(6, 6, CV_32F, cv::Scalar::all(0));
 
+			/* Calculate the eigenvalues E,and the array V of the eigenvector */
             cv::eigen(matAtA, matE, matV);
             matV.copyTo(matV2);
 
@@ -771,7 +848,7 @@ int main(int argc, char** argv)
                 for (int j = 0; j < 6; j++) {
                   matV2.at<float>(i, j) = 0;
                 }
-                isDegenerate = true;
+                isDegenerate = true; /* What is this degenerate business? -> If # of features found is less than 10 */
               } else {
                 break;
               }
@@ -809,7 +886,13 @@ int main(int argc, char** argv)
         }
       }
 
+
+	  /* Coordinate Transformations begin here */
       float rx, ry, rz, tx, ty, tz;
+
+	  /* Calculate the cumulative change in rotation angle */
+	  /* What the heck is this 1.05?? 
+	     Very shady/smart trick - It seems to increase the system's robustness to rotation */
       AccumulateRotation(transformSum[0], transformSum[1], transformSum[2], 
                          -transform[0], -transform[1] * 1.05, -transform[2], rx, ry, rz);
 
@@ -848,7 +931,9 @@ int main(int argc, char** argv)
       laserOdometry.pose.pose.position.y = ty;
       laserOdometry.pose.pose.position.z = tz;
       pubLaserOdometry.publish(laserOdometry);
+	  /* End of algorithm 1 from LOAM paper */
 
+	  /* The following are just ROS publishing */
       laserOdometryTrans.stamp_ = ros::Time().fromSec(timeSurfPointsLessFlat);
       laserOdometryTrans.setRotation(tf::Quaternion(-geoQuat.y, -geoQuat.z, geoQuat.x, geoQuat.w));
       laserOdometryTrans.setOrigin(tf::Vector3(tx, ty, tz));
