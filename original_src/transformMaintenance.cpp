@@ -1,3 +1,8 @@
+/* This is the last node in LOAM. It is fairly straightforward. The key output of this node
+   is the /integrated_to_init topic. 
+   
+*/
+
 #include <math.h>
 #include <time.h>
 #include <stdio.h>
@@ -122,6 +127,16 @@ void transformAssociateToMap()
                      - (-sin(transformMapped[1]) * x2 + cos(transformMapped[1]) * z2);
 }
 
+
+/* 
+ * The laserOdometryHandler is the key routine in this node. Everytime we receive a /laser_odom_to_init
+ * message, we will callback this function. 
+
+
+ * Something to note: This node receives two messages which are published by laserOdometry and laserMapping.
+ * The frequency of these two nodes are different! In fact, very different from LOAM paper. They run at
+ * 5 Hz and 10 Hz. Not 1 Hz and 10 Hz! 
+*/
 void laserOdometryHandler(const nav_msgs::Odometry::ConstPtr& laserOdometry)
 {
   double roll, pitch, yaw;
@@ -136,11 +151,16 @@ void laserOdometryHandler(const nav_msgs::Odometry::ConstPtr& laserOdometry)
   transformSum[4] = laserOdometry->pose.pose.position.y;
   transformSum[5] = laserOdometry->pose.pose.position.z;
 
+  /* Transform the odometry estimate to the world coordinates */
   transformAssociateToMap();
 
   geoQuat = tf::createQuaternionMsgFromRollPitchYaw
             (transformMapped[2], -transformMapped[0], -transformMapped[1]);
 
+  /* Publish the lidar pose in world coordinates */
+  /* IMPORTANT: We have thus fused the lidar trajectory! Basically, if there is an optimized result, use it.
+   * Otherwise, if there are no optimized odometry result, we just take what is available instead.
+   */
   laserOdometry2.header.stamp = laserOdometry->header.stamp;
   laserOdometry2.pose.pose.orientation.x = -geoQuat.y;
   laserOdometry2.pose.pose.orientation.y = -geoQuat.z;
