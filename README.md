@@ -1,18 +1,24 @@
 # 568-Final-Project
 
-One Paragraph of project description goes here
+This is Team 18's final project git repository for EECS 568: Mobile Robotics. The title of our project is Visual Lidar Odometry and Mapping with KITTI, and team members include: Abdallah, Alexander Crean, Mohamad Farhat, Alexander Groh, Steven Liu and Christopher Wernette.
+
+You can see the results of the algorithm running here: <a href="http://www.youtube.com/watch?feature=player_embedded&v=ZrNLccGeftM
+" target="_blank"><img src="http://img.youtube.com/vi/ZrNLccGeftM/0.jpg" 
+alt="IMAGE ALT TEXT HERE" width="240" height="180" border="10" /></a>
 
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
+First, we recommend you read through our paper uploaded here
+
+We recommend you read through the original [V-LOAM](http://www.frc.ri.cmu.edu/~jizhang03/Publications/ICRA_2015.pdf) paper by Ji Zhang and Sanjiv Singh as a primer. Follow that up with the [LOAM](https://www.ri.cmu.edu/pub_files/2014/7/Ji_LidarMapping_RSS2014_v8.pdf) paper by the same authors. Finally, conclude with reading [DEMO](http://www.frc.ri.cmu.edu/~jizhang03/Publications/IROS_2014.pdf) paper by Ji Zhang et all. These will give you theoretical understanding of the V-LOAM algorithm, and all three provide many references for further reading.
 
 ### Prerequisites
 
-What things you need to install the software and how to install them
-
-```
-Give examples
-```
+First you will need to install [Ubuntu 16.04](http://releases.ubuntu.com/16.04.4/) in order to run ROS-Kinetic. We recommend primary or dual booting Ubuntu as we encountered many issues using virtual machines, which are discussed in detail in our final paper.
+Next up, you will need to install [ROS-Kinetic](http://wiki.ros.org/kinetic) as our algorithm has only been validated on this version of ROS. You can find a detailed installation guide [here](http://wiki.ros.org/kinetic/Installation).
+After that step, you will need to download some [KITTI Raw Data](http://www.cvlibs.net/datasets/kitti/raw_data.php). We recommend reading through their [odometry eval kit](http://kitti.is.tue.mpg.de/kitti/devkit_odometry.zip) to decide which Sequence you would like to run.
+Following this, you will need to download and install the [kitti2bag utility](https://github.com/tomas789/kitti2bag). Detailed instructions can be found within the github README.md.
+As a final prerequisite, you will need to have Matlab installed to run our benchmarking code, although it is not necessary in order
 
 ### Installing
 
