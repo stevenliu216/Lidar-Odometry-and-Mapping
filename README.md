@@ -63,6 +63,29 @@ to see the flow of data throughout the project. This will also help you debug an
 ## Building Viewable Maps
 Install the Rqt Multiplot Plugin tool found [here](https://github.com/ethz-asl/rqt_multiplot_plugin)
 
+On one terminal run:
+```
+$ roscore
+```
+
+On a separate terminal run:
+```
+$ rqt --force-discover
+```
+In the menu bar, select plugins -> visualization -> multiplot
+Detailed instructions for how to format plots can be found at the github [source](https://github.com/ethz-asl/rqt_multiplot_plugin).
+
+In a third terminal, run this command:
+```
+$ roslaunch loam_velodyne loam_velodyne.launch
+```
+And finally, in a fourth terminal, run: 
+```
+$ rosbag play kitti_bag_file
+```
+Make sure to hit the play button in top right corner of the plots, after running the kitti .bag file. Allow LOAM to run to completion.
+
+Note: You can also record the topic aft_mapped_to_init or integrated_to_init in a separate bag file, and just use that with rqt_multiplot. This will run much faster.
 
 ## Running the Benchmarking Code
 
