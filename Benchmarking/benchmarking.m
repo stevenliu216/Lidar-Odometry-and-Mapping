@@ -13,7 +13,7 @@ close all
 clear
 clc
 
-%% Paramsters you can change
+%% Paramters you can change
 sequenceNumber = '08'; %change this to which sequence you want analyzed
 plotInRealTime = 1; %used to plot errors and position in real time to see where they stem from while moving
 %rotatation needed for points, changes per data set
@@ -38,7 +38,7 @@ finderPose = strfind(a, TEXT_POSE); %beginning of position data
 TEXT_ORIENTATION = 'orientation:';
 finderOrientation = strfind(a, TEXT_ORIENTATION); %beginning of orientation data
 
-%extract x, y, z values from results file
+%% Extract x, y, z values from results file
 count = 1;
 i = finderPose(1);
 while i <= length(a)
@@ -75,18 +75,20 @@ while i <= length(a)
 end
 fclose(fileID);
 
+%% Extract ground truth results
 fileID = fopen(groundTruthFile, 'r');
 b = fscanf(fileID, '%f'); %read data as floats
 temp = reshape(b,[12 length(b)/12])';
 groundTruth = [temp(:,4) temp(:,8) temp(:,12)];
 fclose(fileID);
 
+%% Translate, rotate, and use only necessary results
 deltaLength = length(position)-length(groundTruth);
 if translateAndRotate == 1
     deltaLength = length(position)-length(groundTruth);
     %apply rotation to true x and y coordinates (x and z in file)
     i = 1;
-    while i <= length(position) && rotationOn == 1
+    while i <= length(position)
         temp = [position(i,1) position(i,3)]*R;
         convertPosition(i,1) = -temp(1); %negative needed to flip x
         convertPosition(i,2) = temp(2);
@@ -106,6 +108,7 @@ else
     convertPosition(:,2) = position(deltaLength+1:end,3);
 end
 
+%% Plot ground truth and results and save as images
 figure
 plot(groundTruth(:,1), groundTruth(:,3))
 title('Ground Truth')
@@ -131,7 +134,7 @@ y = [0.88 0.78];
 annotation('textarrow',x,y,'String','Ending Position')
 saveas(gcf, [picturesPath sequenceNumber 'GTvR.png'])
 
-
+%% Calculate translation and rotation error over time
 for i = 2:length(groundTruth)
     %calculate translation error
     dxP = (convertPosition(i-1,1)-convertPosition(i,1));
@@ -154,6 +157,7 @@ finalRotationError = sum(rotationError)/length(rotationError);
 absolutePositionError = sqrt((convertPosition(end,1)-groundTruth(end,1))^2 +...
     (convertPosition(end,2)-groundTruth(end,3))^2);
 
+%% Plot errors
 xAx = [1:length(translationError)];
 figure
 subplot(2,1,1)
@@ -164,12 +168,12 @@ plot(xAx, rotationError)
 title('Rotation Error')
 saveas(gcf, [picturesPath sequenceNumber 'ErrorsInTime.png'])
 
+%% Display errors in command window
 disp(['Translation Percent Error = ' num2str(translationPercentError(end))])
 disp(['Rotation Error = ' num2str(finalRotationError)])
-%disp(['Rotation Error = ' num2str(rotationError2(end))])
-%disp(['Rotation Error = ' num2str(rotationError3(end))])
 disp(['Absolute Position Error = ' num2str(absolutePositionError)])
 
+%% Plot errors and position in real time
 figure
 if plotInRealTime == 1
     for i = 1:20:length(translationError)
@@ -204,7 +208,9 @@ else
 end
 saveas(gcf, [picturesPath sequenceNumber 'ErrorsAndPositionInTime.png'])
 
-
+%% Restrict angle between -pi and pi.
+%%Credit Dr. Maani Ghaffari Jadidi and
+%%Dr. Ryan Eustice at University of Michigan
 function angle = minimizedAngle(angle)
 
 while angle < -pi
