@@ -60,7 +60,7 @@ $ rqt_graph &
 ```
 to see the flow of data throughout the project. This will also help you debug any issues if your .bag file was formatted incorrectly or if you want to add new features to the code.
 
-## Building Viewable Maps
+## Visualizing Odometry
 Install the Rqt Multiplot Plugin tool found [here](https://github.com/ethz-asl/rqt_multiplot_plugin)
 
 On one terminal run:
