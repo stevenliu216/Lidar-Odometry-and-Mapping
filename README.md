@@ -6,7 +6,7 @@ You can see the results of the algorithm running here:
 
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=YTCnmP5RBuE
 " target="_blank"><img src="http://img.youtube.com/vi/YTCnmP5RBuE/0.jpg" 
-alt="IMAGE ALT TEXT HERE" width="240" height="180" border="10" /></a>
+alt="IMAGE ALT TEXT HERE" width="560" height="400" border="10" /></a>
 
 ## Getting Started
 
