@@ -2,7 +2,9 @@
 
 This is Team 18's final project git repository for EECS 568: Mobile Robotics. The title of our project is Visual Lidar Odometry and Mapping with KITTI, and team members include: Abdallah, Alexander Crean, Mohamad Farhat, Alexander Groh, Steven Liu and Christopher Wernette.
 
-You can see the results of the algorithm running here: <a href="http://www.youtube.com/watch?feature=player_embedded&v=ZrNLccGeftM
+You can see the results of the algorithm running here: 
+
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=ZrNLccGeftM
 " target="_blank"><img src="http://img.youtube.com/vi/ZrNLccGeftM/0.jpg" 
 alt="IMAGE ALT TEXT HERE" width="240" height="180" border="10" /></a>
 
