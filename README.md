@@ -48,7 +48,7 @@ And in a second terminal run:
 ```
 $ rosbag play ~/Downloads/YOUR_BAG_FILE_NAME.bag 
 ```
-On a slower computer, you may want to set the rate setting to a slower rate in order to give your computer more time between playback steps. This can be done by:
+On a slower computer, you may want to set the rate setting to a slower rate in order to give your computer more time between playback steps. This can be done by changing .1 to your preferred rate:
 
 ```
 $ rosbag play -r .1 ~/Downloads/YOUR_BAG_FILE_NAME.bag 
@@ -60,6 +60,10 @@ $ rqt_graph &
 ```
 to see the flow of data throughout the project. This will also help you debug any issues if your .bag file was formatted incorrectly or if you want to add new features to the code.
 
+## Building Viewable Maps
+Install the Rqt Multiplot Plugin tool found [here](https://github.com/ethz-asl/rqt_multiplot_plugin)
+
+
 ## Running the Benchmarking Code
 
 In order to run the benchmarking code, which computes errors as well as plots the odometry vs ground truth pose, you will need to echo out the x, y, z positions of the vehicle to a text file which we will then post process.
@@ -68,9 +72,9 @@ To do this, open a third terminal and type this command before running the .bag 
 $ rostopic echo /laser_odom_to_init/pose/pose/position > FILENAME.txt
 ```
 
-Next, you will need to download the ground truth data from the KITTI ground truth poses from [here](http://www.cvlibs.net/datasets/kitti/eval_odometry.php). Move your echoed out file and the raw data file to the Benchmarking directory which contains our 
+Next, you will need to download the ground truth data from the KITTI ground truth poses from [here](http://www.cvlibs.net/datasets/kitti/eval_odometry.php). Move your echoed out file and the raw data file to the Benchmarking directory which contains our script. You will need to modify this script to match your filenames but otherwise no additional modification is needed.
 
 ## Acknowledgments
 
-Thank you to Maani Ghaffari Jadidi our EECS 568 instructor, as well as the rest of the EECS 568 staff.
+Thank you to Maani Ghaffari Jadidi our EECS 568 instructor, as well as the GSIs Lu Gan and Steven Parkison for all the support they provided this semester. You can find a link to our course website [here](http://robots.engin.umich.edu/mobilerobotics/).
 We would like to acknowledge Ji Zhang and Sanjiv Singh, for their original papers and source code, as well as Leonid Laboshin for the modified version of Ji Zhang and Sanjiv Singh's code, which was taken down. Leonid's repository can be found [here](https://github.com/laboshinl/loam_velodyne).
