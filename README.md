@@ -70,59 +70,7 @@ $ rostopic echo /laser_odom_to_init/pose/pose/position > FILENAME.txt
 
 Next, you will need to download the ground truth data from the KITTI ground truth poses from [here](http://www.cvlibs.net/datasets/kitti/eval_odometry.php). Move your echoed out file and the raw data file to the Benchmarking directory which contains our 
 
-### Break down into end to end tests
-
-Explain what these tests test and why
-
-```
-Give an example
-```
-
-### And coding style tests
-
-Explain what these tests test and why
-
-```
-Give an example
-```
-
-## Deployment
-
-Add additional notes about how to deploy this on a live system
-
-## Built With
-
-* [Dropwizard](http://www.dropwizard.io/1.0.2/docs/) - The web framework used
-* [Maven](https://maven.apache.org/) - Dependency Management
-* [ROME](https://rometools.github.io/rome/) - Used to generate RSS Feeds
-
-## Contributing
-
-Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
-
-## Versioning
-
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags). 
-
-## Authors
-
-* **Billie Thompson** - *Initial work* - [PurpleBooth](https://github.com/PurpleBooth)
-
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
-
 ## Acknowledgments
 
-* Hat tip to anyone who's code was used
-* Inspiration
-* etc
-
-
-# Project Proposal
-[Project Proposal](/Project_Proposal.pdf)
-
-# Ji Zhang's Original Source Code
-http://docs.ros.org/indigo/api/loam_velodyne/html/files.html
+Thank you to Maani Ghaffari Jadidi our EECS 568 instructor, as well as the rest of the EECS 568 staff.
+We would like to acknowledge Ji Zhang and Sanjiv Singh, for their original papers and source code, as well as Leonid Laboshin for the modified version of Ji Zhang and Sanjiv Singh's code, which was taken down. Leonid's repository can be found [here](https://github.com/laboshinl/loam_velodyne).
