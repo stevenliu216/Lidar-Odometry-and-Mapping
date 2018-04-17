@@ -27,7 +27,7 @@ As a final prerequisite, you will need to have Matlab installed to run our bench
 ### Installing
 Before installing this package, ensure that velodyne drivers are installed. A ROS package is provided at [https://github.com/ros-drivers/velodyne]. Short summary of installation instructions:
 ```
-$ sudo apt-get install ros-PACKAGE-velodyne  
+$ sudo apt-get install ros-{YOUR ROS DISTRO}-velodyne  
 $ cd ~/catkin_ws/src/  
 $ git clone https://github.com/ros-drivers/velodyne.git  
 $ cd ~/catkin_ws  
