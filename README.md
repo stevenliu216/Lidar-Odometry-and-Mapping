@@ -27,11 +27,11 @@ As a final prerequisite, you will need to have Matlab installed to run our bench
 ### Installing
 Before installing this package, ensure that velodyne drivers are installed. A ROS package is provided at [https://github.com/ros-drivers/velodyne]. Short summary of installation instructions:
 ```
-sudo apt-get install ros-PACKAGE-velodyne  
-cd ~/catkin_ws/src/  
-git clone https://github.com/ros-drivers/velodyne.git  
-cd ~/catkin_ws  
-catkin_make  
+$ sudo apt-get install ros-PACKAGE-velodyne  
+$ cd ~/catkin_ws/src/  
+$ git clone https://github.com/ros-drivers/velodyne.git  
+$ cd ~/catkin_ws  
+$ catkin_make  
 ```
 
 After installing velodyne drivers, proceed by cloning our loam_velodyne directory into your `~/catkin/src` directory. This can be done simply by:
