@@ -25,7 +25,14 @@ Following this, you will need to download and install the [kitti2bag utility](ht
 As a final prerequisite, you will need to have Matlab installed to run our benchmarking code, although it is not necessary in order
 
 ### Installing
-Before installing this package, ensure that velodyne drivers are installed. A ROS package is provided at [https://github.com/ros-drivers/velodyne]. 
+Before installing this package, ensure that velodyne drivers are installed. A ROS package is provided at [https://github.com/ros-drivers/velodyne]. Short summary of installation instructions:
+```
+sudo apt-get install ros-PACKAGE-velodyne  
+cd ~/catkin_ws/src/  
+git clone https://github.com/ros-drivers/velodyne.git  
+cd ~/catkin_ws  
+catkin_make  
+```
 
 After installing velodyne drivers, proceed by cloning our loam_velodyne directory into your `~/catkin/src` directory. This can be done simply by:
 
