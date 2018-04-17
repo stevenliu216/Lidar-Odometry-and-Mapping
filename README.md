@@ -2,7 +2,7 @@
 
 This is Team 18's final project git repository for EECS 568: Mobile Robotics. The title of our project is Visual Lidar Odometry and Mapping with KITTI, and team members include: Ali Abdallah, Alexander Crean, Mohamad Farhat, Alexander Groh, Steven Liu and Christopher Wernette.
 
-A sample ROS bag file, cut from sequence 08 of KITTI, is provided here: [A sample bag file cut from KITTI sequence 08 is available at: [https://drive.google.com/open?id=1r7nlpAfTL3p1pqSlM7zTQDmk9sHpClZ_]
+A sample ROS bag file, cut from sequence 08 of KITTI, is provided here:[https://drive.google.com/open?id=1r7nlpAfTL3p1pqSlM7zTQDmk9sHpClZ_]
 
 You can see the results of the algorithm running here: 
 
