@@ -5,10 +5,10 @@ This is Team 18's final project git repository for EECS 568: Mobile Robotics. Th
 A sample ROS bag file, cut from sequence 08 of KITTI, is provided [here](https://drive.google.com/open?id=1r7nlpAfTL3p1pqSlM7zTQDmk9sHpClZ_).
 
 You can see the results of the algorithm running here: 
-
-<a href="http://www.youtube.com/watch?feature=player_embedded&v=YTCnmP5RBuE
-" target="_blank"><img src="http://img.youtube.com/vi/YTCnmP5RBuE/0.jpg" 
-alt="IMAGE ALT TEXT HERE" width="560" height="400" border="10" /></a>
+<p align="center">
+ <a href="http://www.youtube.com/watch?feature=player_embedded&v=YTCnmP5RBuE"><img src="./Team18_568_FinalProject/KITTI08.gif" alt="result" width=560></a>
+ <br>LOAM on KITTI 08 (click for full video)
+</p>
 
 ## Getting Started
 
